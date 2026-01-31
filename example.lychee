@@ -1,6 +1,101 @@
-# an example lychee program
+# *****************************
+# *                           *
+# *          lychee           *
+# *                           *
+# *****************************
 
-x = 10;
-y = 20;
+# lychee is a simple, dynamically typed, functional programming language
+# lychee is an experiment in building a programming language
 
-z = add(x, y);
+
+# *****************************
+# *                           *
+# *        statements         *
+# *                           *
+# *****************************
+
+# all statements in lychee end with a semicolon
+print(x, y);
+
+
+
+# *****************************
+# *                           *
+# *          numbers          *
+# *                           *
+# *****************************
+
+# numbers must always start with a digit
+x = 420;
+y = 0.5;
+
+
+
+# *****************************
+# *                           *
+# *          strings          *
+# *                           *
+# *****************************
+
+# strings must begin and end with double quotes
+a = "hello world";
+b = "this is a string";
+
+
+
+# *****************************
+# *                           *
+# *         functions         *
+# *                           *
+# *****************************
+
+# functions are anonymous by default - the following function will not be run
+() {
+  print("hello world");
+}; # does nothing
+
+# however, functions can be assigned to a variable and invoked later
+f = () {
+  print("hello world");
+};
+f(); # prints "hello world"
+
+# or anonymous functions can be invoked immediately
+() {
+  print("hello world");
+} (); # prints "hello world"
+
+
+
+# *****************************
+# *                           *
+# *        arithmetic         *
+# *                           *
+# *****************************
+
+# lychee does not have any operators, instead it relies on built-in functions to perform operations
+add(420, 69);
+sub(3.14, 1.414);
+
+
+
+# *****************************
+# *                           *
+# *       control flow        *
+# *                           *
+# *****************************
+
+# lychee does not have any control flow statements, instead it relies on built-in functions to perform branching operations
+if(
+  lt(x, y), # 1 when x is less than y, 0 otherwise
+
+  # then...
+  () {
+    print("x is less than y");
+  },
+
+  # else...
+  () {
+    print("x is NOT less than y");
+  }
+);

@@ -116,6 +116,12 @@ function ast(tokens) {
     }
   }
 
+  const Identifier = {
+    new(value) {
+      return { is: "identifier", value }
+    }
+  }
+
   const Assignment = {
     new(identifier, expression) {
       return { is: "assignment", identifier, expression }
@@ -129,8 +135,8 @@ function ast(tokens) {
   }
 
   const Dispatch = {
-    new(identifier, arguments_) {
-      return { is: "dispatch", identifier, arguments: arguments_ }
+    new(expression, arguments_) {
+      return { is: "dispatch", expression, arguments: arguments_ }
     }
   }
 
@@ -144,7 +150,7 @@ function ast(tokens) {
     if (expectsId.kind !== Token.ID   ) 
       return { ok: false, warn: `Expected identifier but received '${expectsId.kind}' instead` }
 
-    return { ok: true, node: expectsId.value, tokens }
+    return { ok: true, node: Identifier.new(expectsId.value), tokens }
   }
 
   /** @param {Array<Token>} tokens */
@@ -207,11 +213,21 @@ function ast(tokens) {
     if (tokens.length === 0)
       return { ok: false, warn: `Expected id but reached end of file instead` }
 
-    const maybeIdentifier = tryParseIdentifier(tokens)
-    if (!maybeIdentifier.ok) 
-      return maybeIdentifier
+    const peekOnce = tokens.shift()
 
-    tokens = maybeIdentifier.tokens
+    let lhs
+
+    if (peekOnce.kind === Token.ID) {
+      lhs = tryParseIdentifier([peekOnce, ...tokens])
+      if (!lhs.ok) 
+        return lhs
+    } else  if (peekOnce.kind === Token.L_PAREN) {
+      lhs = tryParseDefinition([peekOnce, ...tokens])
+      if (!lhs.ok) 
+        return lhs
+    }
+
+    tokens = lhs.tokens
     if (tokens.length === 0)
       return { ok: false, warn: `Expected '=' but reached end of file instead` }
 
@@ -250,7 +266,7 @@ function ast(tokens) {
     if (maybeRp.kind !== Token.R_PAREN)
       return { ok: false, token: maybeRp, warn: `Expected ')' but received '${maybeRp.kind}' instead` }
 
-    return { ok: true, node: Dispatch.new(maybeIdentifier.node, arguments_), tokens }
+    return { ok: true, node: Dispatch.new(lhs.node, arguments_), tokens }
   } 
 
   /** @param {Array<Token>} tokens */
@@ -351,7 +367,10 @@ function ast(tokens) {
     }
 
     else if (peekOnce.kind === Token.L_PAREN) {
-      return tryParseDefinition([peekOnce, ...tokens])
+      const maybeDispatch = tryParseDispatch  ([peekOnce, ...tokens])
+      if (!maybeDispatch.ok)
+        return tryParseDefinition([peekOnce, ...tokens])
+      return maybeDispatch
     }
 
     else if (peekOnce.kind === Token.NUMBER) {
@@ -378,7 +397,7 @@ function ast(tokens) {
 
     const expectsSc = tokens.shift()
     if (expectsSc.kind !== Token.SEMICOLON) 
-      return { ok: false, warn: `Expected ';' but received '${expectsSc.kind}' instead` }
+      return { ok: false, token: expectsSc, warn: `Expected ';' but received '${expectsSc.kind}' instead` }
 
     return { ok: true, node: maybeExpression.node, tokens }
   }
