@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+
+    <title>Lychee Playground</title>
+  </head>
+  <body>
+    <script src="lychee.js"></script>
+    <style>
+      textarea {
+        min-width : 400px;
+        min-height: 600px;
+      }
+    </style>
+
+    <textarea id="raw"></textarea>
+    <textarea id="lex" readonly></textarea>
+    <textarea id="ast" readonly></textarea>
+    <textarea id="out" readonly></textarea>
+
+    <script>
+      const raw   = document.getElementById("raw")
+      const lexed = document.getElementById("lex")
+      const asted = document.getElementById("ast")
+      const out   = document.getElementById("out")
+
+      fetch("./example.lychee")
+        .then(r => r.text()         )
+        .then(t => raw.innerHTML = t)
+        .then(update)
+
+      function update() {
+        try {
+          const tokens = [...lex(raw.value)]
+          lexed.value  = JSON.stringify(tokens, null, 2)
+
+          try {
+            const statements = ast(tokens)
+            asted.value = JSON.stringify(statements, null, 2)
+          } catch (e) {
+            asted.value = e.message
+          }
+
+        } catch (e) {
+          lexed.value = e.message
+        }
+      }
+
+      raw.oninput = update
+    </script>
+  </body>
+</html>
