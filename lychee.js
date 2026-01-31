@@ -123,8 +123,8 @@ function ast(tokens) {
   }
 
   const Assignment = {
-    new(identifier, expression) {
-      return { is: "assignment", identifier, expression }
+    new(lhs, rhs) {
+      return { is: "assignment", lhs, rhs }
     }
   }
 
