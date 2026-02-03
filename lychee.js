@@ -219,8 +219,8 @@ const Nodes = {
 }
 
 const Node = {
-  id(identifier) {
-    return { kind: Nodes.ID, identifier }
+  id(value) {
+    return { kind: Nodes.ID, value }
   },
 
   fun(parameters, statements) {
@@ -371,6 +371,8 @@ function ast(s) {
     if (!expression.ok)
       return expression
 
+    i = expression.i
+
     return node(i, Node.var(expectsId.node, expression.node))
   }
 
@@ -388,8 +390,11 @@ function ast(s) {
     const parameters = [ ]
 
     let maybeRp = s[i]
+
     while (maybeRp.kind !== Tokens.RP) {
+      console.log(maybeRp)
       let        p = tryParseVar(s, i)
+      console.log(p)
       if (!p.ok) p = tryParseId (s, i)
       if (!p.ok) return p
 
@@ -572,4 +577,63 @@ function ast(s) {
   } 
 
   return statements
+}
+
+
+
+function *run(statements) {
+  const scope = { }
+
+  
+
+  function tryEvalNoop(scope, node) {
+    if (node.kind !== Nodes.NOOP)
+      throw new Error(`[run] Expected noop but received '${node.kind}' instead`)
+
+
+  }
+
+  function tryEvalNumber(scope, node) {
+    if (node.kind !== Nodes.NUM)
+      throw new Error(`[run] Expected number but received '${node.kind}' instead`)
+
+    return node.value
+  }
+
+  function tryEvalString(scope, node) {
+    if (node.kind !== Nodes.STR)
+      throw new Error(`[run] Expected string but received '${node.kind}' instead`)
+    
+    return node.value
+  }
+
+  function tryEvalId(scope, node) {
+    if (node.kind !== Nodes.ID)
+      throw new Error(`[run] Expected id but received '${node.kind}' instead`)
+    
+    const value = scope[node.identifier]
+    if (value === undefined)
+      throw new Error(`[run] Id '${node.identifier}' not found in current scope`)
+    
+    return value
+  }
+
+  function tryEvalVar(scope, node) {
+    if (node.kind !== Nodes.VAR)
+      throw new Error(`[run] Expected var but received '${node.kind}' instead`)
+    
+    const id    = node.identifier.value
+    const value = tryEvalExpression(scope, node.expression)
+
+    return scope[id] = value
+  }
+
+  function tryEvalRun(scope, node) {
+    if (node.kind !== Nodes.RUN)
+      throw new Error(`[run] Expected run but received '${node.kind}' instead`)
+
+    let definition = node.definition
+    if (definition.kind === Nodes.ID)
+      definition = tryEvalId(scope, definition)
+  }
 }
