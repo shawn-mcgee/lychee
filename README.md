@@ -31,6 +31,18 @@ a = "hello world";
 b = "this is a string";
 ```
 
+### Objects
+
+Objects are wrapped in curly braces:
+
+```lychee
+obj = {
+  0     = "value",
+  key   = "value",
+  "key" = "value",
+};
+```
+
 ### Functions
 Anonymous by default:
 

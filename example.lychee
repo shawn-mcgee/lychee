@@ -45,6 +45,22 @@ b = "this is a string";
 
 # *****************************
 # *                           *
+# *          objects          *
+# *                           *
+# *****************************
+
+# objects are wrapped in curly braces
+obj = {
+  0     = "value",
+  key   = value,
+  "key" = 0,
+};
+
+# object keys can be numbers, strings, or identifiers
+# object values can be any expression
+
+# *****************************
+# *                           *
 # *         functions         *
 # *                           *
 # *****************************
