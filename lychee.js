@@ -1,41 +1,109 @@
-const Token = {
-  ID        : "id",
-  EQUAL     : "eq",
-  COMMA     : "ma",
-  SEMICOLON : "sc",
-  L_PAREN   : "lp",
-  R_PAREN   : "rp",
-  L_BRACE   : "lb",
-  R_BRACE   : "rb",
-  NUMBER    : "num",
-  STRING    : "str",
-
-  new(kind, value, row, col) {
-    return { kind, value, row, col }
+const Where = {
+  new(
+    idx = 0,
+    row = 1,
+    col = 1
+  ) {
+    return { idx, row, col }
   }
 }
 
-function *lex(s) {
-  let i   = 0
-  let row = 1
-  let col = 1
+const Tokens = {
+  ID : "token:id", 
+
+  EQ : "token:eq", // =
+  LS : "token:ls", // ,
+  LP : "token:lp", // (
+  RP : "token:rp", // )
+  LB : "token:lb", // {
+  RB : "token:rb", // }
+  LK : "token:lk", // [
+  RK : "token:rk", // ]
+  SC : "token:sc", // ;
+
+  NUM: "token:num",
+  STR: "token:str",
+
+  END: "token:end",
+}
+
+const Token = {
+  new(kind, value, where) {
+    return { kind, value, where }
+  },
+
+  id(value, where) {
+    return Token.new(Tokens.ID, value, where)
+  },
+
+  eq(where) {
+    return Token.new(Tokens.EQ, "=", where)
+  },
+
+  ls(where) {
+    return Token.new(Tokens.LS, ",", where)
+  },
+
+  lp(where) {
+    return Token.new(Tokens.LP, "(", where)
+  },
+ 
+  rp(where) {
+    return Token.new(Tokens.RP, ")", where)
+  },
+ 
+  lb(where) {
+    return Token.new(Tokens.LB, "{", where)
+  },
+ 
+  rb(where) {
+    return Token.new(Tokens.RB, "}", where)
+  },
+ 
+  lk(where) {
+    return Token.new(Tokens.LK, "[", where)
+  },
+ 
+  rk(where) {
+    return Token.new(Tokens.RK, "]", where)
+  },
+
+  sc(where) {
+    return Token.new(Tokens.SC, ";", where)
+  },
+
+  num(value, where) {
+    return Token.new(Tokens.NUM, value, where)
+  },
+ 
+  str(value, where) {
+    return Token.new(Tokens.STR, value, where)
+  },
+
+  end(value, where) {
+    return Token.new(Tokens.END, value, where)
+  },
+}
+
+function *lex(string) {
+  let i = Where.new()
 
   function eof() {
-    return i >= s.length
+    return i.idx >= string.length
   }
-  
+
   function peek() {
-    return s[i]
+    return string[i.idx]
   }
 
   function read() {
-    let c = s[i]
-    i += 1
+    const c = string[i.idx]
+    i.idx += 1
     if (c === "\n") {
-      row += 1
-      col  = 1
+      i.row += 1
+      i.col  = 1
     } else {
-      col += 1
+      i.col += 1
     }
     return c
   }
@@ -62,19 +130,23 @@ function *lex(s) {
   }
 
   while (!eof()) {
-    let _row = row
-    let _col = col
-    let c = read()
+    const j = {...i}
+    const c = read()
 
+    // skip whitespace
     if (isSpace(c)) continue
-    else if (c === "=") yield Token.new(Token.EQUAL    , c, _row, _col)
-    else if (c === ",") yield Token.new(Token.COMMA    , c, _row, _col)
-    else if (c === "(") yield Token.new(Token.L_PAREN  , c, _row, _col)
-    else if (c === ")") yield Token.new(Token.R_PAREN  , c, _row, _col)
-    else if (c === "{") yield Token.new(Token.L_BRACE  , c, _row, _col)
-    else if (c === "}") yield Token.new(Token.R_BRACE  , c, _row, _col)
-    else if (c === ";") yield Token.new(Token.SEMICOLON, c, _row, _col)
-    else if (isDigit(c)) {
+    // read symbols
+    else if (c === "=") yield Token.eq(j);
+    else if (c === ",") yield Token.ls(j);
+    else if (c === "(") yield Token.lp(j);
+    else if (c === ")") yield Token.rp(j);
+    else if (c === "{") yield Token.lb(j);
+    else if (c === "}") yield Token.rb(j);
+    else if (c === "[") yield Token.lk(j);
+    else if (c === "]") yield Token.rk(j);
+    else if (c === ";") yield Token.sc(j);
+    // read number
+    else if (isDigit(c) || c === "-" || c === "+") {
       let value = c
       while (!eof() && isDigit(peek()))
         value += read()
@@ -82,334 +154,395 @@ function *lex(s) {
         value += read()
       while (!eof() && isDigit(peek()))
         value += read()
-      yield Token.new(Token.NUMBER, value, _row, _col)
-    } else if (c === '"') {
+      yield Token.num(Number(value), j)
+    }
+    // read string
+    else if (c === '"') {
       let value = c
       while (!eof() && peek() !== '"')
         value += read()
       if (!eof() && peek() === '"')
         value += read()
-      yield Token.new(Token.STRING, value, _row, _col)
-    } else if (isAlpha(c)) {
+      yield Token.str(value, j)
+    }
+    // read id
+    else if (isAlpha(c)) {
       let value = c
-      while (!eof() && isAlpha(peek()))
-        value += read()
-      yield Token.new(Token.ID, value, _row, _col)
-    } else if (c === "#") {
+      while (!eof() && (
+        isAlpha(peek()) ||
+        isDigit(peek())
+      )) value += read()
+      yield Token.id(value, j)
+    }
+    // read comment
+    else if (c === "#") {
       while (!eof() && peek() !== "\n")
         read()
-    } else throw new Error(`[lex] Unexpected character '${c}' on line ${_row}:${_col}`)
+    }
+    else throw new Error(`[lex] Unexpected character '${c}' on line ${i.row}:${i.col}`)
   }
 }
 
-function ast(tokens) {
+const Nodes = {
+  ID : "node:id" ,
+  VAR: "node:var",
+  FUN: "node:fun",
+  RUN: "node:run" ,
 
-  const Number = {
-    new(value) {
-      return { is: "number", value }
-    }
+  NUM: "node:num",
+  STR: "node:str",
+  OBJ: "node:obj",
+}
+
+const Node = {
+  id(identifier) {
+    return { kind: Nodes.ID, identifier }
+  },
+
+  fun(parameters, statements) {
+    return { kind: Nodes.FUN, parameters, statements }
+  },
+
+  var(identifier, expression) {
+    return { kind: Nodes.VAR, identifier, expression }
+  },
+
+  run(definition, arguments_) {
+    return { kind: Nodes.RUN, definition, arguments_ }
+  },
+
+  num(value) {
+    return { kind: Nodes.NUM, value }
+  },
+
+  str(value) {
+    return { kind: Nodes.STR, value }
+  },
+
+  obj(pairs) {
+    return { kind: Nodes.OBJ, pairs }
+  }
+}
+
+function ast(s) {
+
+  function node(s, node) {
+    return { ok: true , node, s }
   }
 
-  const String = {
-    new(value) {
-      return { is: "string", value }
-    }
+  function warn(s, warn) {
+    return { ok: false, warn, s }
   }
 
-  const Identifier = {
-    new(value) {
-      return { is: "identifier", value }
-    }
+  function tryParseId(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseId] Expected id but reached end of file instead`)
+
+    const expectsId = s.shift()
+    if (expectsId.kind !== Tokens.ID)
+      return warn([expectsId, ...s], `[ast/tryParseId] Expected id but received '${expectsId.kind}' instead at ${expectsId.where?.row}:${expectsId.where?.col}`)
+
+    return node(s, Node.id(expectsId.value))
   }
 
-  const Assignment = {
-    new(lhs, rhs) {
-      return { is: "assignment", lhs, rhs }
-    }
+  /** @param {Array<Token>} s */
+  function tryParseNumber(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseNumber] Expected number but reached end of file instead`)
+      
+    const expectsNum = s.shift()
+    if (expectsNum.kind !== Tokens.NUM)
+      return warn([expectsNum, ...s], `[ast/tryParseNumber] Expected number but received '${expectsNum.kind}' instead at ${expectsNum.where?.row}:${expectsNum.where?.col}`)
+
+    return node(s, Node.num(expectsNum.value))
   }
 
-  const Definition = {
-    new(parameters, statements) {
-      return { is: "definition", parameters, statements }
-    }
+  /** @param {Array<Token>} s */
+  function tryParseString(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseString] Expected string but reached end of file instead`)
+  
+    const expectsStr = s.shift()
+    if (expectsStr.kind !== Tokens.STR)
+      return warn([expectsStr, ...s], `[ast/tryParseString] Expected string but received '${expectsStr.kind}' instead at ${expectsStr.where?.row}:${expectsStr.where?.col}`)
+
+    return node(s, Node.str(expectsStr.value))
   }
 
-  const Dispatch = {
-    new(expression, arguments_) {
-      return { is: "dispatch", expression, arguments: arguments_ }
-    }
-  }
+  /** @param {Array<Token>} s */
+  function tryParseObject(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseObject] Expected object but reached end of file instead`)
 
-  function tryParseIdentifier(tokens) {
-    tokens = [...tokens]
+    const expectsLb = s.shift()
+    if (expectsLb.kind !== Tokens.LB)
+      return warn([expectsLb, ...s], `[ast/tryParseObject] Expected '{' but received '${expectsLb.kind}' instead at ${expectsLb.where?.row}:${expectsLb.where?.col}`)
 
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected identifier but reached end of file instead` }
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseObject] Expected pair or '}' but reached end of file instead`)
 
-    const expectsId = tokens.shift()
-    if (expectsId.kind !== Token.ID   ) 
-      return { ok: false, warn: `Expected identifier but received '${expectsId.kind}' instead` }
+    const pairs = [ ]
 
-    return { ok: true, node: Identifier.new(expectsId.value), tokens }
-  }
+    let maybeRb = s.shift()
+    while (maybeRb.kind !== Tokens.RB) {
+      let key = tryParseString([maybeRb, ...s])
+      if (!key.ok)
+          key = tryParseNumber([maybeRb, ...s])
+      if (!key.ok)
+          key = tryParseId    ([maybeRb, ...s])
+      if (!key.ok)
+        return warn(s, `[ast/tryParseObject] Expected key`)
 
-  /** @param {Array<Token>} tokens */
-  function tryParseNumber(tokens) {
-    tokens = [...tokens]
+      s = key.s
+      if (s.length === 0)
+        return warn(s, `[ast/tryParseObject] Expected ':' but reached end of file instead`)
 
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected number but reached end of file instead` }
+      const expectsEq = s.shift()
+      if (expectsEq.kind !== Tokens.EQ)
+        return warn([expectsEq, ...s], `[ast/tryParseObject] Expected '=' but received '${expectsEq.kind}' instead at ${expectsEq.where?.row}:${expectsEq.where?.col}`)
 
-    const expectsNumber = tokens.shift()
-    if (expectsNumber.kind !== Token.NUMBER)
-      return { ok: false, token: expectsNumber, warn: `Expected number but received '${expectsNumber.kind}' instead` }
+      let val = tryParseExp(s)
+      if (!val.ok)
+        return warn(s, `[ast/tryParseObject] Expected value`)
 
-    return { ok: true, node: Number.new(expectsNumber.value), tokens }
-  }
+      pairs.push([key.node, val.node])
 
-  /** @param {Array<Token>} tokens */
-  function tryParseString(tokens) {
-    tokens = [...tokens]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected string but reached end of file instead` }
-
-    const expectsString = tokens.shift()
-    if (expectsString.kind !== Token.STRING) 
-      return { ok: false, token: expectsString, warn: `Expected string but received '${expectsString.kind}' instead` }
-
-    return { ok: true, node: String.new(expectsString.value), tokens }
-  }
-
-  /** @param {Array<Token>} tokens */
-  function tryParseAssignment(tokens) {
-    tokens = [...tokens]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected id but reached end of file instead` }
-
-    const maybeIdentifier = tryParseIdentifier(tokens)
-    if (!maybeIdentifier.ok) 
-      return maybeIdentifier
-
-    tokens = maybeIdentifier.tokens
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected '=' but reached end of file instead` }
-
-    const expectsEq = tokens.shift()
-    if (expectsEq.kind !== Token.EQUAL) 
-      return { ok: false, warn: `Expected '=' but received '${expectsEq.kind}' instead` }
-
-    const maybeExpression = tryParseExpression(tokens)
-    if (!maybeExpression.ok) 
-      return maybeExpression
-
-    return { ok: true, node: Assignment.new(maybeIdentifier.node, maybeExpression.node), tokens: maybeExpression.tokens }
-  } 
-
-  function tryParseDispatch(tokens) {
-    tokens = [...tokens]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected id but reached end of file instead` }
-
-    const peekOnce = tokens.shift()
-
-    let lhs
-
-    if (peekOnce.kind === Token.ID) {
-      lhs = tryParseIdentifier([peekOnce, ...tokens])
-      if (!lhs.ok) 
-        return lhs
-    } else  if (peekOnce.kind === Token.L_PAREN) {
-      lhs = tryParseDefinition([peekOnce, ...tokens])
-      if (!lhs.ok) 
-        return lhs
-    }
-
-    tokens = lhs.tokens
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected '=' but reached end of file instead` }
-
-    const expectsLp = tokens.shift()
-    if (expectsLp.kind !== Token.L_PAREN) 
-      return { ok: false, warn: `Expected '(' but received '${expectsLp.kind}' instead` }
-
-    /** @type {Array<Expression>} */
-    const arguments_ = [ ]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected expression or ')' but reached end of file instead` }
-
-    let maybeRp = tokens.shift()
-    while (maybeRp.kind !== Token.R_PAREN) {
-      const maybeExpression = tryParseExpression([maybeRp, ...tokens])
-      if (!maybeExpression.ok) 
-        return maybeExpression
-
-      arguments_.push(maybeExpression.node)
-
-      tokens = maybeExpression.tokens
-      if (tokens.length === 0)
-        return { ok: false, warn: `Expected expression or ')' but reached end of file instead` }
-
-      maybeRp = tokens.shift()
-      if (maybeRp.kind === Token.COMMA) {
-        if (tokens.length === 0)
-          return { ok: false, warn: `Expected expression or ')' but reached end of file instead` }
-        maybeRp = tokens.shift()
-      } else
-        if (maybeRp.kind !== Token.R_PAREN)
-          return { ok: false, warn: `Expected expression or ')' but received '${maybeRp.kind}' instead` }
-    }
-
-    if (maybeRp.kind !== Token.R_PAREN)
-      return { ok: false, token: maybeRp, warn: `Expected ')' but received '${maybeRp.kind}' instead` }
-
-    return { ok: true, node: Dispatch.new(lhs.node, arguments_), tokens }
-  } 
-
-  /** @param {Array<Token>} tokens */
-  function tryParseDefinition(tokens) {
-    tokens = [...tokens]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected '(' but reached end of file instead` }
-
-    const expectsLp = tokens.shift()    
-    if (expectsLp.kind !== Token.L_PAREN) 
-       return { ok: false, warn: `Expected '(' but received '${expectsLp.kind}' instead` }
-
-    /** @type {Array<string>} */
-    const parameters = [ ]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected id or ')' but reached end of file instead` }
-
-    let maybeRp = tokens.shift()
-    while (maybeRp.kind !== Token.R_PAREN) {
-      const maybeIdentifier = tryParseIdentifier([maybeRp, ...tokens])
-      if (!maybeIdentifier.ok) 
-        return maybeIdentifier
-
-      parameters.push(maybeIdentifier.node)
-
-      tokens = maybeIdentifier.tokens
-      if (tokens.length === 0)
-        return { ok: false, warn: `Expected ',' or ')' but reached end of file instead` }
-
-      maybeRp = tokens.shift()
-      if (maybeRp.kind === Token.COMMA  ) {
-        if (tokens.length === 0)
-          return { ok: false, warn: `Expected identifier or ')' but reached end of file instead` }
-        maybeRp = tokens.shift()
+      s = val.s
+      if (s.length === 0)
+        return warn(s, `[ast/tryParseObject] Expected ',' or '}' but reached end of file instead`)
+    
+      maybeRb = s.shift()
+      if (maybeRb.kind === Tokens.LS) {
+        if (s.length === 0)
+          return warn(s, `[ast/tryParseObject] Expected value or '}' but reached end of file instead`)
+        maybeRb = s.shift()
       }
     }
 
-    if (maybeRp.kind !== Token.R_PAREN)
-      return { ok: false, token: maybeRp, warn: `Expected ')' but received '${maybeRp.kind}' instead` }
+    if (maybeRb.kind !== Tokens.RB)
+      return warn([maybeRb, ...s], `[ast/tryParseObject] Expected '}' but received '${maybeRb.kind}' instead at ${maybeRb.where?.row}:${maybeRb.where?.col}`)
 
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected '{' but reached end of file instead` }
+    return node(s, Node.obj(pairs))
+  }
 
-    const expectsLb = tokens.shift()
-    if (expectsLb.kind !== Token.L_BRACE) 
-      return { ok: false, warn: `Expected '{' but received '${expectsLb.kind}' instead` }
+  function tryParseVar(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseVar] Expected assignment but reached end of file instead`)
 
-    /** @type {Array<Statement>} */
+    const expectsId = tryParseId (s)
+    if (!expectsId.ok)
+      return expectsId
+
+    s = expectsId .s
+
+    const expectsEq = s.shift()
+    if (expectsEq.kind !== Tokens.EQ)
+      return warn([expectsEq, ...s], `[ast/tryParseVar] Expected '=' but received '${expectsEq.kind}' instead at ${expectsEq.where?.row}:${expectsEq.where?.col}`)
+
+    const expectsExp = tryParseExp(s)
+    if (!expectsExp.ok) 
+      return expectsExp
+
+    s = expectsExp.s
+    
+    return node(s, Node.var(expectsId.node, expectsExp.node))
+  }
+
+  function tryParseFun(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseFun] Expected function but reached end of file instead`)
+  
+    const expectsLp = s.shift()
+    if (expectsLp.kind !== Tokens.LP)
+      return warn([expectsLp, ...s], `[ast/tryParseFun] Expected '(' but received '${expectsLp.kind}' instead at ${expectsLp.where?.row}:${expectsLp.where?.col}`)
+  
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseFun] Expected expression or ')' but reached end of file instead`)
+  
+    const parameters = [ ]
+
+    let maybeRp = s.shift()
+    while (maybeRp.kind !== Tokens.RP) {
+      let parameter = tryParseVar([maybeRp, ...s])
+      if (!parameter.ok)
+          parameter = tryParseId ([maybeRp, ...s])
+      if (!parameter.ok)
+        return warn(s, `[ast/tryParseFun] Expected parameter or ')'`)
+
+      parameters.push(parameter.node)
+
+      s = parameter.s
+      if (s.length === 0)
+        return warn(s, `[ast/tryParseFun] Expected ',' or ')' but reached end of file instead`)
+
+      maybeRp = s.shift()
+      if (maybeRp.kind === Tokens.LS) {
+        if (s.length === 0)
+          return warn(s, `[ast/tryParseFun] Expected parameter or ')' but reached end of file instead`)
+        maybeRp = s.shift()
+      }
+    }
+
+    if (maybeRp.kind !== Tokens.RP)
+      return warn([maybeRp, ...s], `[ast/tryParseFun] Expected ')' but received '${maybeRp.kind}' instead at ${maybeRp.where?.row}:${maybeRp.where?.col}`)
+  
+    const expectsLb = s.shift()
+    if (expectsLb.kind !== Tokens.LB)
+      return warn([expectsLb, ...s], `[ast/tryParseFun] Expected '{' but received '${expectsLb.kind}' instead at ${expectsLb.where?.row}:${expectsLb.where?.col}`)
+
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseFun] Expected statement or '}' but reached end of file instead`)
+
     const statements = [ ]
 
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected statement or '}' but reached end of file instead` }
-
-    let maybeRb = tokens.shift()
-    while (maybeRb.kind !== Token.R_BRACE) {
-      const maybeStatement = tryParseStatement([maybeRb, ...tokens])
+    let maybeRb = s.shift()
+    while (maybeRb.kind !== Tokens.RB) {
+      const maybeStatement = tryParseStatement([maybeRb, ...s])
       if (!maybeStatement.ok) 
         return maybeStatement
-
       statements.push(maybeStatement.node)
 
-      tokens = maybeStatement.tokens
-      if (tokens.length === 0)
-        return { ok: false, warn: `Expected statement or '}' but reached end of file instead` }
-
-      maybeRb = tokens.shift()
+      s = maybeStatement.s
+      if (s.length === 0)
+        return warn(s, `[ast/tryParseFun] Expected statement or '}' but reached end of file instead`)
+      
+      maybeRb = s.shift()
     }
 
-    if (maybeRb.kind !== Token.R_BRACE)
-      return { ok: false, token: maybeRb, warn: `Expected '}' but received '${maybeRb.kind}' instead` }
+    if (maybeRb.kind !== Tokens.RB)
+      return warn([maybeRb, ...s], `[ast/tryParseFun] Expected '}' but received '${maybeRb.kind}' instead at ${maybeRb.where?.row}:${maybeRb.where?.col}`)
 
-    return { ok: true, node: Definition.new(parameters, statements), tokens }
-  }
-  
-  function tryParseExpression(tokens) {
-    tokens = [...tokens]
-
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected expression but reached end of file instead` }
-
-    const peekOnce = tokens.shift()
-
-    if (peekOnce.kind === Token.ID) {
-      if (tokens.length === 0)
-        return { ok: false, token: peekOnce, warn: `Expected expression but reached end of file instead` }
-
-      const peekTwice = tokens.shift()
-           if (peekTwice.kind === Token.EQUAL  )
-        return tryParseAssignment  ([peekOnce, peekTwice, ...tokens])
-      else if (peekTwice.kind === Token.L_PAREN)
-        return tryParseDispatch  ([peekOnce, peekTwice, ...tokens])
-      else
-        return tryParseIdentifier([peekOnce, peekTwice, ...tokens])
-
-      return { ok: false, token: peekTwice, warn: `Expected expression but received '${peekTwice.kind}' instead` }
-    }
-
-    else if (peekOnce.kind === Token.L_PAREN) {
-      const maybeDispatch = tryParseDispatch  ([peekOnce, ...tokens])
-      if (!maybeDispatch.ok)
-        return tryParseDefinition([peekOnce, ...tokens])
-      return maybeDispatch
-    }
-
-    else if (peekOnce.kind === Token.NUMBER) {
-      return tryParseNumber([peekOnce, ...tokens])
-    }
-
-    else if (peekOnce.kind === Token.STRING) {
-      return tryParseString([peekOnce, ...tokens])
-    }
-
-    return { ok: false, token: peekOnce, warn: `Expected expression but received '${peekOnce.kind}' instead` }
+    return node(s, Node.fun(parameters, statements))
   }
 
-  function tryParseStatement (tokens) {
-    tokens = [...tokens]
+  function tryParseRun(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseRun] Expected dispatch but reached end of file instead`)
 
-    const maybeExpression = tryParseExpression(tokens)
-    if (!maybeExpression.ok) 
-      return maybeExpression
+    let definition = tryParseId (s);
+    if (!definition.ok)
+        definition = tryParseFun(s);
+    if (!definition.ok)
+      return definition;
 
-    tokens = maybeExpression.tokens
-    if (tokens.length === 0)
-      return { ok: false, warn: `Expected ';' but reached end of file instead` }
+    s = definition.s
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseRun] Expected '(' but reached end of file instead`)
 
-    const expectsSc = tokens.shift()
-    if (expectsSc.kind !== Token.SEMICOLON) 
-      return { ok: false, token: expectsSc, warn: `Expected ';' but received '${expectsSc.kind}' instead` }
+    const expectsLp = s.shift()
+    if (expectsLp.kind !== Tokens.LP)
+      return warn([expectsLp, ...s], `[ast/tryParseRun] Expected '(' but received '${expectsLp.kind}' instead at ${expectsLp.where?.row}:${expectsLp.where?.col}`)
 
-    return { ok: true, node: maybeExpression.node, tokens }
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseRun] Expected expression or ')' but reached end of file instead`)
+
+    const arguments_ = [ ]
+
+    let maybeRp = s.shift()
+    while (maybeRp.kind !== Tokens.RP) {
+      const maybeExp = tryParseExp([maybeRp, ...s])
+      if (!maybeExp.ok) 
+        return maybeExp
+
+      arguments_.push(maybeExp.node)
+
+      s = maybeExp.s
+      if (s.length === 0)
+        return warn(s, `[ast/tryParseRun] Expected ',' or ')' but reached end of file instead`)
+
+      maybeRp = s.shift()
+      if (maybeRp.kind === Tokens.LS) {
+        if (s.length === 0)
+          return warn(s, `[ast/tryParseRun] Expected expression or ')' but reached end of file instead`)
+        maybeRp = s.shift()
+      }
+    }
+
+    if (maybeRp.kind !== Tokens.RP)
+      return warn([maybeRp, ...s], `[ast/tryParseRun] Expected ')' but received '${maybeRp.kind}' instead at ${maybeRp.where?.row}:${maybeRp.where?.col}`)
+
+    return node(s, Node.run(definition.node, arguments_))
+  }
+
+  function tryParseExp(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseExp] Expected expression but reached end of file instead`)
+
+    // skip end tokens
+    let peek = s.shift()
+    while (peek?.kind === Tokens.SC)
+      peek = s.shift()
+
+    if (s.length === 0)
+        return warn(s, `[ast/tryParseExp] Expected expression but reached end of file instead`)
+
+    if (peek.kind === Tokens.ID) {
+      const maybeVar = tryParseVar([peek, ...s])
+      if (maybeVar.ok)
+        return maybeVar
+
+      const maybeRun = tryParseRun([peek, ...s])
+      if (maybeRun.ok)
+        return maybeRun
+
+      return tryParseId([peek, ...s])
+    }
+
+    else if (peek.kind === Tokens.NUM)
+      return tryParseNumber([peek, ...s])
+    else if (peek.kind === Tokens.STR)
+      return tryParseString([peek, ...s])
+    else if (peek.kind === Tokens.LB )
+      return tryParseObject([peek, ...s])
+    else if (peek.kind === Tokens.LP ) {
+      const maybeRun = tryParseRun([peek, ...s])
+      if (maybeRun.ok)
+        return maybeRun
+
+      const maybeFun = tryParseFun([peek, ...s])
+      if (maybeFun.ok)
+        return maybeFun
+    }
+
+    return warn(s, `[ast/tryParseExp] Expected expression but received '${peek.kind}' instead at ${peek.where?.row}:${peek.where?.col}`)
+  }
+
+  function tryParseStatement(s) {
+    s = [...s]
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseStatement] Expected statement but reached end of file instead`)
+
+    const maybeExp = tryParseExp(s)
+    if (!maybeExp.ok) 
+      return maybeExp
+
+    s = maybeExp.s
+    if (s.length === 0)
+      return warn(s, `[ast/tryParseStatement] Expected ';' but reached end of file instead`)
+
+    const maybeSc = s.shift()
+    if (maybeSc.kind !== Tokens.SC)
+      return warn([maybeSc, ...s], `[ast/tryParseStatement] Expected ';' but received '${maybeSc.kind}' instead at ${maybeSc.where?.row}:${maybeSc.where?.col}`)
+
+    return maybeExp
   }
 
   const statements = [ ]
 
-  while (tokens.length > 0) {
-    const maybeStatement = tryParseStatement(tokens)
+  while(s.length > 0) {
+    const maybeStatement = tryParseStatement(s)
     if (!maybeStatement.ok) 
-      throw new Error(`[ast] ${maybeStatement.warn} at ${maybeStatement.token?.row}:${maybeStatement.token?.col}`)
+      throw new Error(`[ast] ${maybeStatement.warn}`)
     statements.push(maybeStatement.node)
-    tokens = maybeStatement.tokens
+    s = maybeStatement.s
   }
 
   return statements

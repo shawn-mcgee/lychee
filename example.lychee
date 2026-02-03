@@ -73,7 +73,10 @@ f(); # prints "hello world"
 # *                           *
 # *****************************
 
-# lychee does not have any operators, instead it relies on built-in functions to perform operations
+# lychee does not have any arithmetic operators
+# instead it relies on built-in functions 
+# to perform arithmetic operations
+
 add(420, 69);
 sub(3.14, 1.414);
 
@@ -85,7 +88,10 @@ sub(3.14, 1.414);
 # *                           *
 # *****************************
 
-# lychee does not have any control flow statements, instead it relies on built-in functions to perform branching operations
+# lychee does not have any control flow statements
+# instead it relies on built-in functions 
+# to perform branching operations
+
 if(
   lt(x, y), # 1 when x is less than y, 0 otherwise
 

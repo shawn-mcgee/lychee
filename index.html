@@ -1,52 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/simple.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+
+
 
     <title>Lychee Playground</title>
   </head>
   <body>
     <script src="lychee.js"></script>
     <style>
-      textarea {
-        min-width : 400px;
-        min-height: 600px;
+      body {
+        inset: 0;
+        margin: 0;
+        padding: 0;
       }
+
+      #lychee {
+        inset: 0;
+        margin: 0;
+        padding: 0;
+
+        width : 100dvw;
+        height: 100dvh;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .CodeMirror {
+        height: 100dvh;
+      }
+
+
     </style>
 
-    <textarea id="raw"></textarea>
-    <textarea id="lex" readonly></textarea>
-    <textarea id="ast" readonly></textarea>
-    <textarea id="out" readonly></textarea>
+    <div id="lychee">
+      <textarea id="input"></textarea>
+      <textarea id="tokens" readonly></textarea>
+      <textarea id="syntax" readonly></textarea>
+    </div>
 
     <script>
-      const raw   = document.getElementById("raw")
-      const lexed = document.getElementById("lex")
-      const asted = document.getElementById("ast")
-      const out   = document.getElementById("out")
+
+      CodeMirror.defineSimpleMode("lychee", {
+        start: [
+          {regex: /[\+\-]?[0-9]+\.?[0-9]*/, token: "number"},
+          {regex: /".*?"/, token: "string"},
+          {regex: /#.*/, token: "comment"},
+          {regex: /[a-zA-Z_][a-zA-Z0-9_]*(?=\s*=)/, token: "variable"},
+          {regex: /[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\()/, token: "variable-2"},
+          {regex: /[a-zA-Z_][a-zA-Z0-9_]*/, token: "variable-3"}
+        ]
+      });
+
+      const editor = CodeMirror.fromTextArea(document.getElementById("input"), {
+        lineNumbers: true,
+        mode: "lychee",
+        theme: "monokai"
+      });
+
+      const tokens = CodeMirror.fromTextArea(document.getElementById("tokens"), {
+        lineNumbers: true,
+        readOnly: true,
+        mode: "application/json",
+        theme: "monokai"
+      });
+
+      const syntax = CodeMirror.fromTextArea(document.getElementById("syntax"), {
+        lineNumbers: true,
+        readOnly: true,
+        mode: "application/json",
+        theme: "monokai"
+      });
 
       fetch("./example.lychee")
-        .then(r => r.text()         )
-        .then(t => raw.innerHTML = t)
-        .then(update)
+        .then(r => r.text()          )
+        .then(t => editor.setValue(t))
+        .then(t => update())
 
       function update() {
         try {
-          const tokens = [...lex(raw.value)]
-          lexed.value  = JSON.stringify(tokens, null, 2)
+          const t = [...lex(editor.getValue())]
+          tokens.setValue(JSON.stringify(t, null, 2))
 
           try {
-            const statements = ast(tokens)
-            asted.value = JSON.stringify(statements, null, 2)
+            const s = ast(t)
+            syntax.setValue(JSON.stringify(s, null, 2))
           } catch (e) {
-            asted.value = e.message
+            syntax.setValue(e.message)
           }
 
         } catch (e) {
-          lexed.value = e.message
+          tokens.setValue(e.message)
         }
       }
 
-      raw.oninput = update
+      editor.on("change", update)
+      update()
     </script>
   </body>
 </html>
