@@ -5,8 +5,6 @@ An experimental language designed to explore language design and interpreter imp
 
 ---
 
-## 📝 Quick Syntax
-
 ### Statements
 
 All statements end with a semicolon:
@@ -62,7 +60,7 @@ Branching is handled via built-in functions:
 ```lychee
 if(
   lt(x, y), 
-  () { print("x is less than y"); },
-  () { print("x is NOT less than y"); }
+  () { "x is less than y"; },
+  () { "x is NOT less than y"; }
 );
 ```

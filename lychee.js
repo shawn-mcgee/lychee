@@ -608,6 +608,9 @@ function run(statements) {
     or : (scope, a, b) => Node.num(+(a?.value ||  b?.value)),
     not: (scope, a   ) => Node.num(+(!a?.value)),
 
+    PI: Node.num(Math.PI),
+    E : Node.num(Math.E ),
+
     print: (scope, a) => console.log(a),
   }
 
