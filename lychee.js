@@ -579,40 +579,36 @@ function ast(s) {
 
 function run(statements) {
   const scope = { 
-    add : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value + tryEvalExpression(scope, b)?.value),
-    sub : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value - tryEvalExpression(scope, b)?.value),
-    mul : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value * tryEvalExpression(scope, b)?.value),
-    div : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value / tryEvalExpression(scope, b)?.value),
-    mod : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value % tryEvalExpression(scope, b)?.value),
-    sin : (scope, a   ) => Node.num(Math.sin(tryEvalExpression(scope, a)?.value)),
-    cos : (scope, a   ) => Node.num(Math.cos(tryEvalExpression(scope, a)?.value)),
-    tan : (scope, a   ) => Node.num(Math.tan(tryEvalExpression(scope, a)?.value)),
-    log : (scope, a   ) => Node.num(Math.log(tryEvalExpression(scope, a)?.value)),
-    exp : (scope, a   ) => Node.num(Math.exp(tryEvalExpression(scope, a)?.value)),
-    sqrt: (scope, a   ) => Node.num(Math.sqrt(tryEvalExpression(scope, a)?.value)),
-    pow : (scope, a, b) => Node.num(Math.pow(
-      tryEvalExpression(scope, a)?.value,
-      tryEvalExpression(scope, b)?.value
-    )),
+    add : (scope, a, b) => Node.num(a?.value + b?.value),
+    sub : (scope, a, b) => Node.num(a?.value - b?.value),
+    mul : (scope, a, b) => Node.num(a?.value * b?.value),
+    div : (scope, a, b) => Node.num(a?.value / b?.value),
+    mod : (scope, a, b) => Node.num(a?.value % b?.value),
+    sin : (scope, a   ) => Node.num(Math.sin (a?.value)),
+    cos : (scope, a   ) => Node.num(Math.cos (a?.value)),
+    tan : (scope, a   ) => Node.num(Math.tan (a?.value)),
+    log : (scope, a   ) => Node.num(Math.log (a?.value)),
+    exp : (scope, a   ) => Node.num(Math.exp (a?.value)),
+    sqrt: (scope, a   ) => Node.num(Math.sqrt(a?.value)),
+    pow : (scope, a, b) => Node.num(Math.pow(a?.value, b?.value)),
 
-    "if": (scope, cond, then, else_ = Node.noop()) => 
-      tryEvalExpression(scope, cond )?.value ?
-      tryEvalExpression(scope, then ) : 
-      tryEvalExpression(scope, else_) ,
+    "if": (scope, cond, then = Node.noop(), else_ = Node.noop()) => 
+      cond?.value ?
+      tryEvalRun(scope, Node.run(then , [ ])):
+      tryEvalRun(scope, Node.run(else_, [ ])),
 
-    lt: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value < tryEvalExpression(scope, b)?.value)),
-    gt: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value > tryEvalExpression(scope, b)?.value)),
-    eq: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value === tryEvalExpression(scope, b)?.value)),
-    ne: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value !== tryEvalExpression(scope, b)?.value)),
-    lte: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value <= tryEvalExpression(scope, b)?.value)),
-    gte: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value >= tryEvalExpression(scope, b)?.value)),
-    and: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value && tryEvalExpression(scope, b)?.value)),
-    or : (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value || tryEvalExpression(scope, b)?.value)),
-    not: (scope, a   ) => Node.num(+(!tryEvalExpression(scope, a)?.value)),
+    lt : (scope, a, b) => Node.num(+(a?.value <   b?.value)),
+    gt : (scope, a, b) => Node.num(+(a?.value >   b?.value)),
+    eq : (scope, a, b) => Node.num(+(a?.value === b?.value)),
+    neq: (scope, a, b) => Node.num(+(a?.value !== b?.value)),
+    lte: (scope, a, b) => Node.num(+(a?.value <=  b?.value)),
+    gte: (scope, a, b) => Node.num(+(a?.value >=  b?.value)),
 
-    print: (scope, a) => console.log(tryEvalExpression(scope, a)?.value),
+    and: (scope, a, b) => Node.num(+(a?.value &&  b?.value)),
+    or : (scope, a, b) => Node.num(+(a?.value ||  b?.value)),
+    not: (scope, a   ) => Node.num(+(!a?.value)),
 
-    
+    print: (scope, a) => console.log(a),
   }
 
   function tryEvalNoop(scope, node) {
@@ -678,10 +674,13 @@ function run(statements) {
     const funScope = { ...scope }
 
     if (typeof definition === "function") {
-      return definition(funScope, ...node.arguments_)
+      return definition(funScope, ...node.arguments_.map(a => tryEvalExpression(funScope, a)))
     }
 
-    if (definition.kind !== Nodes.FUN)
+    if (definition.kind === Nodes.NOOP)
+      return null
+
+    if (definition.kind !== Nodes.FUN )
       throw new Error(`[run] Expected fun but received '${definition.kind}' instead`)
 
     const parameters = definition.parameters
