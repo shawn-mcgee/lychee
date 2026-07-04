@@ -392,9 +392,7 @@ function ast(s) {
     let maybeRp = s[i]
 
     while (maybeRp.kind !== Tokens.RP) {
-      console.log(maybeRp)
       let        p = tryParseVar(s, i)
-      console.log(p)
       if (!p.ok) p = tryParseId (s, i)
       if (!p.ok) return p
 
@@ -579,53 +577,93 @@ function ast(s) {
   return statements
 }
 
+function run(statements) {
+  const scope = { 
+    add : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value + tryEvalExpression(scope, b)?.value),
+    sub : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value - tryEvalExpression(scope, b)?.value),
+    mul : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value * tryEvalExpression(scope, b)?.value),
+    div : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value / tryEvalExpression(scope, b)?.value),
+    mod : (scope, a, b) => Node.num(tryEvalExpression(scope, a)?.value % tryEvalExpression(scope, b)?.value),
+    sin : (scope, a   ) => Node.num(Math.sin(tryEvalExpression(scope, a)?.value)),
+    cos : (scope, a   ) => Node.num(Math.cos(tryEvalExpression(scope, a)?.value)),
+    tan : (scope, a   ) => Node.num(Math.tan(tryEvalExpression(scope, a)?.value)),
+    log : (scope, a   ) => Node.num(Math.log(tryEvalExpression(scope, a)?.value)),
+    exp : (scope, a   ) => Node.num(Math.exp(tryEvalExpression(scope, a)?.value)),
+    sqrt: (scope, a   ) => Node.num(Math.sqrt(tryEvalExpression(scope, a)?.value)),
+    pow : (scope, a, b) => Node.num(Math.pow(
+      tryEvalExpression(scope, a)?.value,
+      tryEvalExpression(scope, b)?.value
+    )),
 
+    "if": (scope, cond, then, else_ = Node.noop()) => 
+      tryEvalExpression(scope, cond )?.value ?
+      tryEvalExpression(scope, then ) : 
+      tryEvalExpression(scope, else_) ,
 
-function *run(statements) {
-  const scope = { }
+    lt: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value < tryEvalExpression(scope, b)?.value)),
+    gt: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value > tryEvalExpression(scope, b)?.value)),
+    eq: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value === tryEvalExpression(scope, b)?.value)),
+    ne: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value !== tryEvalExpression(scope, b)?.value)),
+    lte: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value <= tryEvalExpression(scope, b)?.value)),
+    gte: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value >= tryEvalExpression(scope, b)?.value)),
+    and: (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value && tryEvalExpression(scope, b)?.value)),
+    or : (scope, a, b) => Node.num(+(tryEvalExpression(scope, a)?.value || tryEvalExpression(scope, b)?.value)),
+    not: (scope, a   ) => Node.num(+(!tryEvalExpression(scope, a)?.value)),
 
-  
+    print: (scope, a) => console.log(tryEvalExpression(scope, a)?.value),
+
+    
+  }
 
   function tryEvalNoop(scope, node) {
     if (node.kind !== Nodes.NOOP)
       throw new Error(`[run] Expected noop but received '${node.kind}' instead`)
 
-
+    return null
   }
 
   function tryEvalNumber(scope, node) {
     if (node.kind !== Nodes.NUM)
       throw new Error(`[run] Expected number but received '${node.kind}' instead`)
 
-    return node.value
+    return { ...node }
   }
 
   function tryEvalString(scope, node) {
     if (node.kind !== Nodes.STR)
       throw new Error(`[run] Expected string but received '${node.kind}' instead`)
     
-    return node.value
+    return { ...node }
   }
 
   function tryEvalId(scope, node) {
     if (node.kind !== Nodes.ID)
       throw new Error(`[run] Expected id but received '${node.kind}' instead`)
     
-    const value = scope[node.identifier]
-    if (value === undefined)
-      throw new Error(`[run] Id '${node.identifier}' not found in current scope`)
+    const result = scope[node.value]
+    if (result === undefined)
+      throw new Error(`[run] Id '${node.value}' not found in current scope`)
     
-    return value
+    return result
+  }
+
+  function tryEvalFun(scope, node) {
+    if (node.kind !== Nodes.FUN)
+      throw new Error(`[run] Expected fun but received '${node.kind}' instead`)
+
+    return { ...node }
   }
 
   function tryEvalVar(scope, node) {
     if (node.kind !== Nodes.VAR)
       throw new Error(`[run] Expected var but received '${node.kind}' instead`)
     
-    const id    = node.identifier.value
-    const value = tryEvalExpression(scope, node.expression)
+    const id     = node.identifier.value
+    const result = tryEvalExpression(scope, node.expression)
 
-    return scope[id] = value
+    scope[id] = result
+
+    return result
   }
 
   function tryEvalRun(scope, node) {
@@ -633,7 +671,74 @@ function *run(statements) {
       throw new Error(`[run] Expected run but received '${node.kind}' instead`)
 
     let definition = node.definition
-    if (definition.kind === Nodes.ID)
+
+    if (definition.kind === Nodes.ID )
       definition = tryEvalId(scope, definition)
+
+    const funScope = { ...scope }
+
+    if (typeof definition === "function") {
+      return definition(funScope, ...node.arguments_)
+    }
+
+    if (definition.kind !== Nodes.FUN)
+      throw new Error(`[run] Expected fun but received '${definition.kind}' instead`)
+
+    const parameters = definition.parameters
+    const statements = definition.statements
+    const arguments_ = node.arguments_
+
+
+    for (let i = 0; i < parameters.length; i ++) {
+      const parameter = parameters[i]
+      const argument  = arguments_[i]
+
+      switch (parameter.kind) {
+        case Nodes.ID : {
+          const id     = parameter.value
+          if (argument === undefined)
+            throw new Error(`[run] Expected argument or default value but received nothing instead`)
+          const result = tryEvalExpression(funScope, argument)
+          funScope[id] = result
+        } break;
+        case Nodes.VAR: {
+          const id     = parameter.identifier.value
+          const result = argument === undefined ?
+            tryEvalExpression(funScope, parameter.expression) :
+            tryEvalExpression(funScope, argument            )
+          funScope[id] = result
+        } break;
+      }
+    }
+
+    return tryEvalStatements(funScope, statements)
+  }
+
+  function tryEvalExpression(scope, node) {
+    switch (node?.kind) {
+      case Nodes.NOOP: return tryEvalNoop  (scope, node)
+      case Nodes.NUM : return tryEvalNumber(scope, node)
+      case Nodes.STR : return tryEvalString(scope, node)
+      case Nodes.ID  : return tryEvalId    (scope, node)
+      case Nodes.VAR : return tryEvalVar   (scope, node)
+      case Nodes.RUN : return tryEvalRun   (scope, node)
+      case Nodes.FUN : return tryEvalFun   (scope, node)
+      default        : throw new Error(`[run] Expected statement but received '${node?.kind}' instead`)
+    }
+  }
+
+  function tryEvalStatements(scope, statements) {
+    let value = null
+    for (const statement of statements)
+      value = tryEvalExpression(scope, statement)
+    return value
+  }
+
+  const result = tryEvalStatements(scope, statements)
+
+  switch (result?.kind) {
+    case Nodes.NUM: return result.value
+    case Nodes.STR: return result.value
+    default       : return result === null ? null : typeof result
   }
 }
